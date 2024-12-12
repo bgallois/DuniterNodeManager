@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+
+Name=DuniterNodeManager
+Comment=Graphical duniter node manager.
+Categories=Utility;
+
+Icon=duniternodemanager
+Exec=duniter-node-manager
+Terminal=false

@@ -1,0 +1,107 @@
+name: DuniterNodeManager_build
+
+on:
+  push:
+    branches: [master]
+
+env:
+  QT_VERSION: 6.7.2
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: install_deps
+        run: |
+            sudo apt-get update
+            sudo apt-get dist-upgrade
+            sudo apt-get install mesa-common-dev libgl1-mesa-dev libssl-dev
+            sudo apt-get install libxcb-*
+            sudo apt-get install libxkb-*
+            sudo apt-get install libavcodec-dev libavformat-dev libswscale-dev libnss3
+      - name: install_qt6
+        run: |
+          pip install aqtinstall
+          python3 -m aqt install-qt -O ${{ github.workspace }}/Qt/ linux desktop ${{ env.QT_VERSION }}
+          echo ${{ github.workspace }}/Qt/${{ env.QT_VERSION }}/gcc_64/bin/ >> $GITHUB_PATH
+          rm ${{ github.workspace }}/Qt/${{ env.QT_VERSION }}/gcc_64/plugins/sqldrivers/libqsqlmimer.so
+      - name: build
+        run: |
+          cargo build --release
+      - name: build_appimage
+        run: |
+          cd target/release
+          wget -O deploy.AppImage https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          mkdir appdir
+          cp ../../src/assets/cc.gallois.duniternodemanager.desktop appdir
+          cp ../../src/assets/duniternodemanager.png appdir
+          cp duniter-node-manager appdir
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${{ github.workspace }}/Qt/${{ env.QT_VERSION }}/gcc_64/lib/
+          chmod +x deploy.AppImage
+          ./deploy.AppImage appdir/duniter-node-manager -bundle-non-qt-libs -unsupported-allow-new-glibc -qmake=${{ github.workspace }}/Qt/${{ env.QT_VERSION }}/gcc_64/bin/qmake6 -extra-plugins=platforms/ -exclude-libs=libgmodule-2.0.so,libmimerapi.so -qmldir=../../src/qml
+          wget -O tool.AppImage https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+          chmod +x tool.AppImage
+          ./tool.AppImage appdir/
+      - name: upload_artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DuniterNodeManager-x86_64.AppImage
+          path: ./target/release/DuniterNodeManager-x86_64.AppImage
+
+  build_win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: install_qt
+        run: |
+          pip install aqtinstall
+          python3 -m aqt install-qt -m qtcharts -O ${{ github.workspace }}/Qt/ windows desktop ${{ env.QT_VERSION }} win64_msvc2019_64
+          echo "${{ github.workspace }}/Qt/${{ env.QT_VERSION }}/msvc2019_64/bin/" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "${{ github.workspace }}/Qt/Tools/mingw1310_64/bin/" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: build
+        run: |
+          cargo build --release
+          cd target/release
+          mkdir DuniterNodeManager
+          cp duniter-node-manager.exe DuniterNodeManager/DuniterNodeManager.exe
+          cd DuniterNodeManager
+          windeployqt --qmldir ../../../src/qml DuniterNodeManager.exe --no-translations
+      - name: upload_artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DuniterNodeManager
+          path: target/release/DuniterNodeManager
+
+  build_mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: install_qt
+        run: |
+          pip install aqtinstall
+          python3 -m aqt install-qt -m qtcharts -O ${{ github.workspace }}/Qt/ mac desktop ${{ env.QT_VERSION }}
+          echo ${{ github.workspace }}/Qt/${{ env.QT_VERSION }}/macos/bin/ >> $GITHUB_PATH
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      - name: build
+        run: |
+          cargo install cargo-bundle
+          cargo bundle --release
+          cd target/release/bundle/osx
+          macdeployqt duniter-node-manager.app -always-overwrite -dmg -qmldir ../../../src/qml/
+      - name: upload_artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: duniter-node-manager.dmg
+          path: ./target/release/bundle/osx/duniter-node-manager.dmg
