@@ -10,9 +10,49 @@ ApplicationWindow {
     visible: true
     width: 600
     height: 400
-    title: "SSH Node Control"
+    title: "Duniter Node Manager"
     id: window
     font.family: "Roboto"
+
+    property string doc: "
+        Server Configuration
+        ----------------------
+
+        To run certain `systemctl` commands (e.g., starting and stopping services) without a password prompt,
+        you can configure `sudo` for passwordless access. Follow the steps below:
+
+        1. Edit the `sudoers` File for Passwordless Commands
+        ------------------------------------------------------
+
+        Next, modify the `sudoers` file to allow a user (e.g., `benjamin`) to run specific `systemctl` commands
+        without a password prompt.
+
+        - Open the `sudoers` file with `visudo`:
+
+            ```bash
+            sudo visudo
+            ```
+
+        - Add the following lines at the end of the `sudoers` file. This will allow the user `benjamin` to run
+          `systemctl` commands for starting and stopping the `duniter-smith`, `duniter-mirror`, and 
+          `distance-oracle.timer` services, as well as manage the Duniter node, without entering a password:
+
+            ```bash
+            benjamin ALL=NOPASSWD: /usr/bin/systemctl start duniter-smith.service
+            benjamin ALL=NOPASSWD: /usr/bin/systemctl stop duniter-smith.service
+
+            benjamin ALL=NOPASSWD: /usr/bin/systemctl start duniter-mirror.service
+            benjamin ALL=NOPASSWD: /usr/bin/systemctl stop duniter-mirror.service
+
+            benjamin ALL=NOPASSWD: /usr/bin/systemctl start distance-oracle.timer
+            benjamin ALL=NOPASSWD: /usr/bin/systemctl stop distance-oracle.timer
+
+            benjamin ALL=NOPASSWD: /usr/bin/cat /etc/duniter/env_file
+            benjamin ALL=NOPASSWD: /usr/bin/tee /etc/duniter/env_file
+            ```
+
+        - Save the changes and exit `visudo`. The changes should take effect immediately.
+    "
 
     Settings {
         property alias x: window.x
@@ -196,7 +236,7 @@ ApplicationWindow {
                 readOnly: true
                 font.pointSize: 12
                 placeholderText: "Command output will appear here..."
-                text: main.output
+                text: main.output !== "" ? main.output : doc
                 wrapMode: TextArea.Wrap
             }
         }
