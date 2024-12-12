@@ -121,7 +121,7 @@ impl Main {
     pub fn start_oracle(&mut self, params: String) {
         self.command(
             params.clone(),
-            "sudo systemctl start distance-oracle.timer".into(),
+            "sudo systemctl start distance-oracle.service".into(),
         );
         session!(self, params, |sess: Session| {
             let mut channel = sess.channel_session().unwrap();
@@ -139,7 +139,7 @@ impl Main {
     pub fn stop_oracle(&mut self, params: String) {
         self.command(
             params.clone(),
-            "sudo systemctl stop distance-oracle.timer".into(),
+            "sudo systemctl stop distance-oracle.service".into(),
         );
         session!(self, params, |sess: Session| {
             let mut channel = sess.channel_session().unwrap();
