@@ -5,6 +5,8 @@ use ssh2::Session;
 use std::io::Read;
 use std::net::TcpStream;
 
+mod resources_qml;
+
 #[macro_export]
 macro_rules! session {
     ($self:ident, $params:expr, $body:expr) => {
@@ -180,7 +182,8 @@ fn main() {
     QCoreApplication::set_organization_name("Analyzable".into());
     QCoreApplication::set_organization_domain("gallois.cc".into());
     QCoreApplication::set_application_name("DuniterNodeManager".into());
+    resources_qml::init_resources();
     let mut engine = QmlEngine::new();
-    engine.load_file("src/qml/main.qml".into());
+    engine.load_file("qrc:/qml/main.qml".into());
     engine.exec();
 }
