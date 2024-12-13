@@ -7,4 +7,10 @@ pub fn init_resources() {
         }
     );
     resources_qml();
+    qrc!(resources_assets,
+        "src/assets/" as "assets/" {
+            "duniternodemanager.png",
+        }
+    );
+    resources_assets();
 }

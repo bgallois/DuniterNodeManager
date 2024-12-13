@@ -1,11 +1,18 @@
+use cpp::cpp;
 use cstr::cstr;
 use qmetaobject::prelude::*;
 use qmetaobject::qtcore::core_application::QCoreApplication;
 use qmetaobject::QStringList;
 use ssh2::PublicKey;
 use ssh2::Session;
+use std::ffi::CString;
 use std::io::Read;
 use std::net::TcpStream;
+
+cpp! {{
+    #include <QtGui/QGuiApplication>
+    #include <QIcon>
+}}
 
 mod resources_qml;
 
@@ -242,5 +249,12 @@ fn main() {
     resources_qml::init_resources();
     let mut engine = QmlEngine::new();
     engine.load_file("qrc:/qml/main.qml".into());
+
+    let icon_path = CString::new(":/assets/duniternodemanager.png").expect("CString::new failed");
+    let icon_path_ptr = icon_path.as_ptr();
+    cpp!(unsafe [icon_path_ptr as "const char *"] {
+        QGuiApplication::setWindowIcon(QIcon(icon_path_ptr));
+    });
+
     engine.exec();
 }

@@ -71,6 +71,7 @@ jobs:
           cd target/release
           mkdir DuniterNodeManager
           cp duniter-node-manager.exe DuniterNodeManager/DuniterNodeManager.exe
+          cp ../../src/assets/duniternodemanager.ico DuniterNodeManager/
           cd DuniterNodeManager
           windeployqt --qmldir ../../../src/qml DuniterNodeManager.exe --no-translations
       - name: upload_artefact
