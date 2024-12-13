@@ -88,9 +88,9 @@ ApplicationWindow {
                 Layout.fillWidth: true
 
                 Label {
-                    text: "SSH Address:"
+                    text: "🖧 SSH Address"
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 80
+                    Layout.preferredWidth: 100
                 }
 
                 TextField {
@@ -109,15 +109,17 @@ ApplicationWindow {
                 Layout.fillWidth: true
 
                 Label {
-                    text: "SSH Password:"
+                    text: "🔑 SSH Pass or Key"
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 80
+                    Layout.preferredWidth: 100
                 }
 
-                TextField {
+                ComboBox {
                     id: sshPass
-                    placeholderText: "e.g., pass"
-                    echoMode: TextInput.Password
+                    width: 300
+                    model: main.get_keys()
+                    currentIndex: -1
+                    editable: true
                     Layout.fillWidth: true
                 }
             }
@@ -127,9 +129,9 @@ ApplicationWindow {
                 Layout.fillWidth: true
 
                 Label {
-                    text: "Node Type:"
+                    text: "⚙️ Node Type"
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 80
+                    Layout.preferredWidth: 100
                 }
 
                 ComboBox {
@@ -147,15 +149,15 @@ ApplicationWindow {
             Layout.preferredWidth: 100
 
             Button {
-                text: "Check Installation"
+                text: "🔧 Check Installation"
                 Layout.fillWidth: true
-                onClicked: main.connect_ssh(sshInput.text + "@" + sshPass.text)
+                onClicked: main.check_installation(sshInput.text, sshPass.editText)
             }
 
             Button {
-                text: "See Logs"
+                text: "📜 See Logs"
                 Layout.fillWidth: true
-                onClicked: main.see_logs(sshInput.text + "@" + sshPass.text, nodeType.currentText.toLowerCase())
+                onClicked: main.see_logs(sshInput.text, sshPass.editText, nodeType.currentText.toLowerCase())
             }
         }
 
@@ -166,13 +168,13 @@ ApplicationWindow {
             Layout.preferredWidth: 100
 
             Button {
-                text: "Start Node"
+                text: "🚀🔲 Start Node"
                 Layout.fillWidth: true
-                onClicked: main.start_node(sshInput.text + "@" + sshPass.text, nodeType.currentText.toLowerCase())
+                onClicked: main.start_node(sshInput.text, sshPass.editText, nodeType.currentText.toLowerCase())
             }
 
             Button {
-                text: "Stop Node"
+                text: "🛑🔲 Stop Node"
                 Layout.fillWidth: true
                 onClicked: confirmationDialog.open()
                 MessageDialog {
@@ -180,7 +182,7 @@ ApplicationWindow {
                     title: "Confirm Stopping"
                     text: "Are you sure you want to stop the node? If you are a Smith you need to go offline before stopping a node."
                     onAccepted: {
-                        main.stop_node(sshInput.text + "@" + sshPass.text, nodeType.currentText.toLowerCase())
+                        main.stop_node(sshInput.text, sshPass.editText, nodeType.currentText.toLowerCase())
                     }
                     buttons: MessageDialog.Yes | MessageDialog.No
                 }
@@ -194,15 +196,15 @@ ApplicationWindow {
             Layout.preferredWidth: 100
 
             Button {
-                text: "Start Oracle"
+                text: "🚀🧙 Start Oracle"
                 Layout.fillWidth: true
-                onClicked: main.start_oracle(sshInput.text + "@" + sshPass.text)
+                onClicked: main.start_oracle(sshInput.text, sshPass.editText)
             }
 
             Button {
-                text: "Stop Oracle"
+                text: "🛑🧙 Stop Oracle"
                 Layout.fillWidth: true
-                onClicked: main.start_oracle(sshInput.text + "@" + sshPass.text)
+                onClicked: main.stop_oracle(sshInput.text, sshPass.editText)
             }
         }
 
@@ -213,13 +215,13 @@ ApplicationWindow {
             Layout.preferredWidth: 100
 
             Button {
-                text: "Edit"
+                text: "✏️ Configuration"
                 Layout.fillWidth: true
-                onClicked: main.get_config(sshInput.text + "@" + sshPass.text)
+                onClicked: main.get_config(sshInput.text, sshPass.editText)
             }
 
             Button {
-                text: "Telemetry"
+                text: "📊 Telemetry"
                 Layout.fillWidth: true
                 onClicked: {
                     Qt.openUrlExternally("https://telemetry.polkadot.io/#/0xc184c4ccde8e771483bba7a01533d007a3e19a66d3537c7fd59c5d9e3550b6c3")
@@ -262,7 +264,7 @@ ApplicationWindow {
             }
         }
         onAccepted: {
-            main.write_config(sshInput.text + "@" + sshPass.text, textEditor.text)
+            main.write_config(sshInput.text, sshPass.editText, textEditor.text)
             configEditor.close()
         }
 

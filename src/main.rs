@@ -1,6 +1,8 @@
 use cstr::cstr;
 use qmetaobject::prelude::*;
 use qmetaobject::qtcore::core_application::QCoreApplication;
+use qmetaobject::QStringList;
+use ssh2::PublicKey;
 use ssh2::Session;
 use std::io::Read;
 use std::net::TcpStream;
@@ -9,8 +11,8 @@ mod resources_qml;
 
 #[macro_export]
 macro_rules! session {
-    ($self:ident, $params:expr, $body:expr) => {
-        match $self.open_session($params) {
+    ($self:ident, $params:expr, $pass:expr, $body:expr) => {
+        match $self.open_session($params, $pass) {
             Err(e) => {
                 $self.output = format!("Failed to open session: {:?}", e).into();
                 $self.output_changed();
@@ -25,14 +27,15 @@ macro_rules! session {
 #[derive(QObject, Default)]
 struct Main {
     base: qt_base_class!(trait QObject),
-    connect_ssh: qt_method!(fn(&mut self, params: String)),
-    see_logs: qt_method!(fn(&mut self, params: String, node_string: String)),
-    start_node: qt_method!(fn(&mut self, params: String, node_string: String)),
-    stop_node: qt_method!(fn(&mut self, params: String, node_string: String)),
-    start_oracle: qt_method!(fn(&mut self, params: String)),
-    stop_oracle: qt_method!(fn(&mut self, params: String)),
-    get_config: qt_method!(fn(&mut self, params: String)),
-    write_config: qt_method!(fn(&mut self, params: String, config: String)),
+    check_installation: qt_method!(fn(&mut self, params: String, pass: String)),
+    see_logs: qt_method!(fn(&mut self, params: String, pass: String, node_string: String)),
+    start_node: qt_method!(fn(&mut self, params: String, pass: String, node_string: String)),
+    stop_node: qt_method!(fn(&mut self, params: String, pass: String, node_string: String)),
+    start_oracle: qt_method!(fn(&mut self, params: String, pass: String)),
+    stop_oracle: qt_method!(fn(&mut self, params: String, pass: String)),
+    get_config: qt_method!(fn(&mut self, params: String, pass: String)),
+    write_config: qt_method!(fn(&mut self, params: String, pass: String, config: String)),
+    get_keys: qt_method!(fn(&self) -> QStringList),
     config: qt_property!(QString; NOTIFY config_changed),
     config_changed: qt_signal!(),
     output: qt_property!(QString; NOTIFY output_changed),
@@ -40,18 +43,67 @@ struct Main {
 }
 
 impl Main {
-    fn open_session(&self, params: String) -> Result<Session, ssh2::Error> {
+    fn open_session(&self, params: String, pass: String) -> Result<Session, ssh2::Error> {
         let args: Vec<&str> = params.split("@").collect();
         let tcp = TcpStream::connect(args[1]).map_err(|_| ssh2::Error::eof())?;
         let mut sess = Session::new()?;
         sess.set_tcp_stream(tcp);
         sess.handshake()?;
-        sess.userauth_password(args[0], args[2])?;
+        if pass.contains("🔑") {
+            let mut agent = sess.agent()?;
+            agent.connect()?;
+            agent.list_identities()?;
+            let identity: PublicKey = agent
+                .identities()?
+                .into_iter()
+                .find(|i| {
+                    pass.contains(
+                        &(i.comment().to_owned()
+                            + &i.blob()
+                                .iter()
+                                .map(|&byte| byte as u32)
+                                .sum::<u32>()
+                                .to_string()),
+                    )
+                })
+                .ok_or_else(ssh2::Error::eof)?;
+            agent.userauth(args[0], &identity)?;
+        } else {
+            sess.userauth_password(args[0], &pass)?;
+        }
         Ok(sess)
     }
 
-    pub fn connect_ssh(&mut self, params: String) {
-        session!(self, params, |sess: Session| {
+    fn get_keys(&self) -> QStringList {
+        match self.try_get_keys() {
+            Ok(i) => i,
+            Err(_) => QStringList::default(),
+        }
+    }
+
+    fn try_get_keys(&self) -> Result<QStringList, ssh2::Error> {
+        let sess = Session::new()?;
+        let mut agent = sess.agent()?;
+
+        agent.connect()?;
+        agent.list_identities()?;
+        Ok(agent
+            .identities()?
+            .into_iter()
+            .map(|i| {
+                "🔑".to_string()
+                    + i.comment()
+                    + &i.blob()
+                        .iter()
+                        .map(|&byte| byte as u32)
+                        .sum::<u32>()
+                        .to_string()
+            })
+            .collect())
+    }
+
+    pub fn check_installation(&mut self, params: String, pass: String) {
+        session!(self, params, pass, |sess: Session| {
             let mut channel = sess.channel_session().unwrap();
             channel.exec("command -v duniter2").unwrap();
             let mut s = String::new();
@@ -76,8 +128,8 @@ impl Main {
         });
     }
 
-    pub fn see_logs(&mut self, params: String, node_type: String) {
-        session!(self, params, |sess: Session| {
+    pub fn see_logs(&mut self, params: String, pass: String, node_type: String) {
+        session!(self, params, pass, |sess: Session| {
             let mut channel = sess.channel_session().unwrap();
             channel
                 .exec(&format!(
@@ -93,8 +145,8 @@ impl Main {
         });
     }
 
-    fn command(&mut self, params: String, cmd: String) {
-        session!(self, params, |sess: Session| {
+    fn command(&mut self, params: String, pass: String, cmd: String) {
+        session!(self, params, pass, |sess: Session| {
             let mut channel = sess.channel_session().unwrap();
             channel.exec(&cmd).unwrap();
             channel.wait_eof().unwrap();
@@ -102,28 +154,31 @@ impl Main {
         });
     }
 
-    pub fn start_node(&mut self, params: String, node_type: String) {
+    pub fn start_node(&mut self, params: String, pass: String, node_type: String) {
         self.command(
             params.clone(),
+            pass.clone(),
             format!("sudo systemctl start duniter-{}.service", node_type),
         );
-        self.see_logs(params, node_type);
+        self.see_logs(params, pass, node_type);
     }
 
-    pub fn stop_node(&mut self, params: String, node_type: String) {
+    pub fn stop_node(&mut self, params: String, pass: String, node_type: String) {
         self.command(
             params.clone(),
+            pass.clone(),
             format!("sudo systemctl stop duniter-{}.service", node_type),
         );
-        self.see_logs(params, node_type);
+        self.see_logs(params, pass, node_type);
     }
 
-    pub fn start_oracle(&mut self, params: String) {
+    pub fn start_oracle(&mut self, params: String, pass: String) {
         self.command(
             params.clone(),
+            pass.clone(),
             "sudo systemctl start distance-oracle.service".into(),
         );
-        session!(self, params, |sess: Session| {
+        session!(self, params, pass, |sess: Session| {
             let mut channel = sess.channel_session().unwrap();
             channel
                 .exec("journalctl -ru distance-oracle -n 100")
@@ -136,12 +191,13 @@ impl Main {
         });
     }
 
-    pub fn stop_oracle(&mut self, params: String) {
+    pub fn stop_oracle(&mut self, params: String, pass: String) {
         self.command(
             params.clone(),
+            pass.clone(),
             "sudo systemctl stop distance-oracle.service".into(),
         );
-        session!(self, params, |sess: Session| {
+        session!(self, params, pass, |sess: Session| {
             let mut channel = sess.channel_session().unwrap();
             channel
                 .exec("journalctl -ru distance-oracle -n 100")
@@ -154,8 +210,8 @@ impl Main {
         });
     }
 
-    pub fn get_config(&mut self, params: String) {
-        session!(self, params, |sess: Session| {
+    pub fn get_config(&mut self, params: String, pass: String) {
+        session!(self, params, pass, |sess: Session| {
             let mut channel = sess.channel_session().unwrap();
             channel.exec("sudo cat /etc/duniter/env_file").unwrap();
             let mut s = String::new();
@@ -166,9 +222,10 @@ impl Main {
         });
     }
 
-    pub fn write_config(&mut self, params: String, config: String) {
+    pub fn write_config(&mut self, params: String, pass: String, config: String) {
         self.command(
             params.clone(),
+            pass.clone(),
             format!(
                 "echo \"{}\" | sudo tee /etc/duniter/env_file",
                 config.trim()

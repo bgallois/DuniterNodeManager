@@ -2,15 +2,18 @@
 
 DuniterNodeManager is a minimal graphical tool to manage a Duniter node. With this application, you can:
 
-- Connect to your server via SSH (password authentication only).
+- Connect to your server via SSH (password and keys supported).
 - Edit configuration files.
 - Start/stop the Duniter node and the oracle.
 - View logs directly within the interface.
 
+![](src/assets/main.png)
+![](src/assets/conf_edit.png)
+
 ## Features
 
 - **Graphical Interface**: Manage your Duniter node through an easy-to-use GUI.
-- **SSH Support**: Connect to your server securely (only password authentication supported).
+- **SSH Support**: Connect to your server securely.
 - **Cross-Platform**: Available for Windows, MacOS, and Linux.
 
 ## Server Configuration
