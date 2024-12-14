@@ -1,3 +1,6 @@
+#![recursion_limit = "4096"]
+#![windows_subsystem = "windows"]
+
 use cpp::cpp;
 use cstr::cstr;
 use qmetaobject::prelude::*;
