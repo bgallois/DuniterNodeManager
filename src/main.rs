@@ -55,6 +55,9 @@ struct Main {
 impl Main {
     fn open_session(&self, params: String, pass: String) -> Result<Session, ssh2::Error> {
         let args: Vec<&str> = params.split("@").collect();
+        let _: Result<(), String> = (args.len() == 2)
+            .then_some(Ok(()))
+            .ok_or_else(ssh2::Error::eof)?;
         let tcp = TcpStream::connect(args[1]).map_err(|_| ssh2::Error::eof())?;
         let mut sess = Session::new()?;
         sess.set_tcp_stream(tcp);
@@ -85,10 +88,7 @@ impl Main {
     }
 
     fn get_keys(&self) -> QStringList {
-        match self.try_get_keys() {
-            Ok(i) => i,
-            Err(_) => QStringList::default(),
-        }
+        self.try_get_keys().unwrap_or_default()
     }
 
     fn try_get_keys(&self) -> Result<QStringList, ssh2::Error> {
