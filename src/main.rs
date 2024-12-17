@@ -1,5 +1,6 @@
 #![recursion_limit = "4096"]
 #![windows_subsystem = "windows"]
+#![feature(addr_parse_ascii)]
 
 use cpp::cpp;
 use cstr::cstr;
@@ -24,7 +25,7 @@ macro_rules! session {
     ($self:ident, $params:expr, $pass:expr, $body:expr) => {
         match $self.open_session($params, $pass) {
             Err(e) => {
-                $self.output = format!("Failed to open session: {:?}", e).into();
+                $self.output = format!("Failed to open session: {:?}", e.message()).into();
                 $self.output_changed();
             }
             Ok(sess) => {
@@ -55,10 +56,29 @@ struct Main {
 impl Main {
     fn open_session(&self, params: String, pass: String) -> Result<Session, ssh2::Error> {
         let args: Vec<&str> = params.split("@").collect();
-        let _: Result<(), String> = (args.len() == 2)
-            .then_some(Ok(()))
-            .ok_or_else(ssh2::Error::eof)?;
-        let tcp = TcpStream::connect(args[1]).map_err(|_| ssh2::Error::eof())?;
+        let _: Result<(), String> = (args.len() == 2).then_some(Ok(())).ok_or_else(|| {
+            ssh2::Error::new(
+                ssh2::ErrorCode::Session(0),
+                "Invalid input format: Expected 'username@ip:port'.",
+            )
+        })?;
+        let address = std::net::SocketAddrV4::parse_ascii(args[1].as_bytes()).map_err(|e| {
+            ssh2::Error::new(
+                ssh2::ErrorCode::Session(0),
+                Box::leak(format!("Connexion Error: {}", e).into_boxed_str()),
+            )
+        })?;
+
+        let tcp = TcpStream::connect_timeout(
+            &std::net::SocketAddr::V4(address),
+            std::time::Duration::from_secs(2),
+        )
+        .map_err(|e| {
+            ssh2::Error::new(
+                ssh2::ErrorCode::Session(0),
+                Box::leak(format!("{}", e).into_boxed_str()),
+            )
+        })?;
         let mut sess = Session::new()?;
         sess.set_tcp_stream(tcp);
         sess.handshake()?;
@@ -79,7 +99,10 @@ impl Main {
                                 .to_string()),
                     )
                 })
-                .ok_or_else(ssh2::Error::eof)?;
+                .ok_or(ssh2::Error::new(
+                    ssh2::ErrorCode::Session(0),
+                    "Identity not found",
+                ))?;
             agent.userauth(args[0], &identity)?;
         } else {
             sess.userauth_password(args[0], &pass)?;
